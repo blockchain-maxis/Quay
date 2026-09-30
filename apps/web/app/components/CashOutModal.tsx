@@ -48,7 +48,7 @@ interface Props {
   onSuccess: () => void;
 }
 
-type ModalStep = "loading" | "form" | "confirming" | "submitting" | "transfer" | "error";
+type ModalStep = "loading" | "form" | "confirming" | "submitting" | "transfer" | "awaiting_anchor" | "error";
 
 interface QuotePreview {
   jobId: string;
@@ -305,6 +305,12 @@ export default function CashOutModal({
       if (result.transfer) {
         setTransfer(result.transfer);
         setStep("transfer");
+      } else if (!result.interactiveUrl) {
+        // `kind: "fields"`: the anchor accepted the withdrawal but has not said
+        // where to send the asset yet (e.g. it is still reviewing KYC). Closing
+        // silently would leave the seller thinking nothing more is needed, so
+        // say what happens next instead.
+        setStep("awaiting_anchor");
       } else {
         onSuccess();
       }
@@ -532,6 +538,18 @@ export default function CashOutModal({
               Cancel
             </button>
           </form>
+        )}
+
+        {step === "awaiting_anchor" && (
+          <div>
+            <div className="kyc-note" style={{ marginBottom: 12 }}>
+              The anchor will tell us where to send the USDC once it has finished its checks. We will show the send
+              step on this link when it does.
+            </div>
+            <button className="btn btn--primary btn--block" onClick={onSuccess}>
+              Done
+            </button>
+          </div>
         )}
 
         {/* The anchor is waiting for the asset. The seller's wallet sends it

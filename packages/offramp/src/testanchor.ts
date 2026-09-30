@@ -13,6 +13,7 @@ import {
   type OffRampStateRepository,
   type PayoutFieldDescriptor,
   type SellerPayoutRef,
+  type WithdrawTransfer,
 } from "@checkout/core";
 import { NOOP_LOGGER } from "@checkout/core";
 import type { AnchorDiscovery, SellerAnchorAuth } from "./anchor-session";
@@ -278,6 +279,8 @@ export class TestAnchorOffRamp implements OffRampPort {
       status: "pending",
       externalStatus: null,
       lastError: null,
+      sellAsset: q.sellAsset,
+      sellAmount: q.sellAmount,
       createdAt: now,
       updatedAt: now,
     });
@@ -285,7 +288,8 @@ export class TestAnchorOffRamp implements OffRampPort {
 
     // The anchor pays out only after it receives the asset, and only the
     // seller can send it. Hand back exactly what the anchor asked for; when it
-    // has not said yet (e.g. review pending) the job simply stays pending.
+    // has not said yet (e.g. review pending) the job stays pending and
+    // `status()` relays the instructions once the anchor publishes them.
     if (!withdraw.accountId) return { kind: "fields", jobId: withdraw.id };
     return {
       kind: "transfer",
@@ -317,11 +321,35 @@ export class TestAnchorOffRamp implements OffRampPort {
     const targetAmount = tx.amountOut ?? job.targetAmount;
     const reason = status === "failed" ? (tx.message ?? `${this.anchorName}: withdrawal failed`) : null;
 
+    // SEP-6 lets the anchor leave the deposit instructions out of /withdraw and
+    // publish them here, at pending_user_transfer_start. Without relaying them
+    // nothing would ever ask the seller to send the asset.
+    let transfer: WithdrawTransfer | undefined;
+    if (tx.status === "pending_user_transfer_start" && tx.withdrawAnchorAccount) {
+      if (!job.sellAsset) {
+        // Row from before the asset was stored; we cannot name what to send.
+        child.warn(
+          { event: "anchor.sep6.transfer.unresolvable", jobId },
+          "anchor published deposit instructions but the job has no sell asset",
+        );
+      } else {
+        transfer = {
+          destination: tx.withdrawAnchorAccount,
+          amount: tx.amountIn ?? job.sellAmount ?? "",
+          asset: job.sellAsset,
+          memo: tx.withdrawMemo ?? null,
+          memoType: tx.withdrawMemoType ?? null,
+        };
+        if (!transfer.amount) transfer = undefined;
+      }
+    }
+
     await this.state.updateJob(jobId, {
       targetAmount,
       status,
       externalStatus: tx.status,
       lastError: reason,
+      ...(transfer ? { transfer } : {}),
     });
 
     return {
@@ -332,6 +360,7 @@ export class TestAnchorOffRamp implements OffRampPort {
       targetAmount,
       rate: job.rate,
       reason: reason ?? undefined,
+      ...(transfer ? { transfer } : {}),
     };
   }
 }
