@@ -32,7 +32,11 @@ code="USDC"
 `;
 
 function jwtFor(sub: string): string {
-  const claims = Buffer.from(JSON.stringify({ sub, exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url");
+  // iss/iat are checked by SellerAnchorAuth before it stores a session.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const claims = Buffer.from(
+    JSON.stringify({ iss: `${ORIGIN}/auth`, sub, iat: nowSec, exp: nowSec + 3600 }),
+  ).toString("base64url");
   return ["h", claims, "s"].join(".");
 }
 
@@ -182,7 +186,7 @@ describe("TestAnchorOffRamp.status() — instructions that arrive after /withdra
       withdraw_memo_type: "id",
     };
     const job = await offramp.status("wd_1");
-    expect(job.status).toBe("pending");
+    expect(job.status).toBe("awaiting_transfer");
     // No amount_in: falls back to the quoted sell amount, in the quoted asset.
     expect(job.transfer).toEqual({
       destination: ANCHOR_DEPOSIT_ACCOUNT,

@@ -40,6 +40,7 @@ function job(over: Partial<StoredOffRampJob> = {}): StoredOffRampJob {
     lastError: null,
     sellAsset: USDC,
     sellAmount: "10",
+    transferNotifiedAt: null,
     createdAt: 1,
     updatedAt: 1,
     ...over,
