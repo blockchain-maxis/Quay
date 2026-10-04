@@ -90,6 +90,7 @@ const BOOTSTRAP_SQL = [
      seller_id TEXT, account TEXT, target_currency TEXT NOT NULL, target_amount TEXT NOT NULL, rate TEXT NOT NULL,
      status TEXT NOT NULL, external_status TEXT, last_error TEXT,
      sell_asset_code TEXT, sell_asset_issuer TEXT, sell_amount TEXT, transfer_json TEXT,
+     last_poll_error TEXT, last_poll_error_at INTEGER, last_poll_reason TEXT,
      transfer_notified_at INTEGER,
      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
    )`,
@@ -100,6 +101,12 @@ const BOOTSTRAP_SQL = [
      message TEXT, last_synced_at INTEGER, updated_at INTEGER NOT NULL,
      provided_field_status TEXT, sent_fields TEXT,
      PRIMARY KEY (seller_id, anchor_domain)
+   )`,
+  // Historical last-send time per field and anchor. Values are never stored.
+  `CREATE TABLE IF NOT EXISTS kyc_disclosure_fields (
+     seller_id TEXT NOT NULL, anchor_domain TEXT NOT NULL,
+     field_name TEXT NOT NULL, sent_at INTEGER NOT NULL,
+     UNIQUE (seller_id, anchor_domain, field_name)
    )`,
   `CREATE TABLE IF NOT EXISTS anchor_sessions (
      seller_id TEXT NOT NULL, anchor_domain TEXT NOT NULL, account TEXT NOT NULL,
@@ -177,6 +184,11 @@ const BOOTSTRAP_SQL = [
 // above won't touch an existing table, so add it out-of-band; ignore the
 // "duplicate column" error on databases that already have it.
 const ADDITIVE_MIGRATIONS = [
+  `ALTER TABLE offramp_quotes ADD COLUMN quoted_rate TEXT`,
+  `ALTER TABLE offramp_quotes ADD COLUMN quoted_target_amount TEXT`,
+  `ALTER TABLE offramp_quotes ADD COLUMN quoted_fee_amount TEXT`,
+  `ALTER TABLE offramp_quotes ADD COLUMN quoted_fee_source TEXT`,
+  `ALTER TABLE offramp_quotes ADD COLUMN quoted_net_target_amount TEXT`,
   `ALTER TABLE links ADD COLUMN offramp_indicative_rate TEXT`,
   `ALTER TABLE links ADD COLUMN offramp_rate TEXT`,
   `ALTER TABLE links ADD COLUMN offramp_rate_delta TEXT`,
@@ -208,6 +220,9 @@ const ADDITIVE_MIGRATIONS = [
   `ALTER TABLE offramp_jobs ADD COLUMN sell_asset_issuer TEXT`,
   `ALTER TABLE offramp_jobs ADD COLUMN sell_amount TEXT`,
   `ALTER TABLE offramp_jobs ADD COLUMN transfer_json TEXT`,
+  `ALTER TABLE offramp_jobs ADD COLUMN last_poll_error TEXT`,
+  `ALTER TABLE offramp_jobs ADD COLUMN last_poll_error_at INTEGER`,
+  `ALTER TABLE offramp_jobs ADD COLUMN last_poll_reason TEXT`,
   `ALTER TABLE seller_kyc ADD COLUMN account TEXT`,
   `ALTER TABLE sellers ADD COLUMN last_active_at INTEGER`,
   // Track whether the offramp.transfer_required webhook has been sent for a job.

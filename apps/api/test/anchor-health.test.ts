@@ -474,6 +474,9 @@ class FakeKycAlwaysAcceptedForAnchor implements KycPort {
   async submit(customer: AnchorCustomer): Promise<KycRecord> {
     return this.accepted(customer);
   }
+  async submitFiles(customer: AnchorCustomer): Promise<KycRecord> {
+    return this.accepted(customer);
+  }
   private accepted({ sellerId, account }: AnchorCustomer): KycRecord {
     return {
       sellerId,
@@ -649,7 +652,9 @@ describe("LinkService with AnchorHealth", () => {
     });
     expect(res.status).toBe(502);
     const body = (await res.json()) as { error: string };
-    expect(body.error).toContain("Off-ramp error");
+    // A code clients can branch on: the upstream's own message is logged,
+    // never returned (issue 4.36).
+    expect(body.error).toBe("anchor_error");
   });
 
   it("healthSnapshot reflects the breaker state and is exposed on the service", async () => {
